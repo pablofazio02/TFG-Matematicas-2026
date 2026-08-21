@@ -181,7 +181,7 @@ class IsolationForest:
             X_prime = X[indices]
             
             # Construir iTree
-            tree = iTree(X_prime, current_height=0, height_limit=self.height_limit)
+            tree = iTree(X_prime)
             self.trees.append(tree)
             
         return self
