@@ -1,18 +1,30 @@
 """
-Módulo: isolation_forest.py
-Implementación formal de Isolation Forest basado en Liu et al. (2012)
-Referencia: "Isolation-Based Anomaly Detection", ACM TKDD, Vol. 6, No. 1, 2012.
+Cálculo del algoritmo Isolation Forest desde cero.
+
+Referencia: F. T. Liu, K. M. Ting y Z.-H. Zhou (2012). Isolation-based anomaly
+detection. ACM Transactions on Knowledge Discovery from Data, 6(1), art. 3.
+
+Notación:
+    X          conjunto de datos, lista de n observaciones x = [x_1, ..., x_n]
+    t          número de árboles (iTrees)
+    psi        tamaño de la submuestra de cada árbol
+    hlim       límite de altura en la evaluación (por defecto psi - 1)
+    h(x)       longitud de ruta de x en un iTree
+    c(psi)     longitud media de ruta, ecuación (1)
+    s(x, psi)  puntuación de anomalía, ecuación (2)
+
 """
 
-__author__ = "Pablo Fazio Arrabal"
-__institution__ = "Universidad de Málaga (UMA)"
-__degree__ = "Doble Grado en Matemáticas e Ingeniería Informática"
-
+import random
 import numpy as np
 
-def c_factor(n):
+# ---------------------------------------------------------------------------
+# Ecuación 1: longitud de ruta promedio esperada c(n)
+# ---------------------------------------------------------------------------
+
+def c(n):
     """
-    Calcula la longitud de camino promedio no exitoso de un Binary Search Tree.
+    Definición 4. Calcula la longitud de camino promedio no exitoso de un Binary Search Tree.
     Utilizado para normalizar la longitud de ruta.
     
     Sea H(i) el número armónico estimado como ln(i) + 0.5772156649 (constante de Euler).
@@ -27,204 +39,123 @@ def c_factor(n):
     float
         Valor de ajuste estadístico c(n).
     """
+    CONST_EULER = 0.5772156649  # Constante de Euler-Mascheroni
     if n > 2:
-        CONST_EULER = 0.5772156649
-        harmonic_number = np.log(n - 1) + CONST_EULER
-        return 2.0 * harmonic_number - (2.0 * (n - 1) / n)
+        return 2 * (np.log(n - 1) + CONST_EULER) - 2.0 * (n - 1) / n
     elif n == 2:
         return 1.0
     else:
         return 0.0
 
-class Node:
+
+# ---------------------------------------------------------------------------
+# Ecuación (2):  puntuación de anomalía s(x, psi)
+# ---------------------------------------------------------------------------
+def anomaly_score(x, bosque, psi, hlim=None):
     """
-    Estructura de datos para los nodos del Isolation Tree.
-    Un iTree es un árbol binario propio donde cada nodo interno tiene exactamente 
-    dos nodos hijos y los nodos externos son hojas.
-    """
+    Definición 5. Calcula la puntuación de anomalía s(x, psi) para una observación x.
 
-    def __init__(self, left=None, right=None, split_att=None, split_val=None, size=0, node_type='internal'):
-        self.left = left                    # Rama izquierda (T_L)
-        self.right = right                  # Rama derecha (T_R)
-        self.split_att = split_att          # Atributo de corte aleatorio (q)
-        self.split_val = split_val          # Valor de corte aleatorio (p)
-        self.size = size                    # Número de instancias en el nodo (|X'|)
-        self.node_type = node_type          # Tipo de nodo: 'internal' o 'external'
+    Sea E(h(x)) la media de h(x) sobre los t árboles del bosque.
 
-def iTree(X_prime):
-    """
-    Algoritmo 2: iTree(X') - Construcción recursiva de un árbol de aislamiento.
-    
-    El proceso de partición selecciona aleatoriamente un atributo q y un punto de 
-    corte p entre el mínimo y máximo de dicho atributo q. La división continúa hasta 
-    que el nodo tiene una sola instancia, todas las instancias son idénticas, 
-    o se alcanza el límite de altura predefinido.
-    
-    Parámetros:
-    -----------
-    X_prime : numpy.ndarray
-        Submuestra de datos actual en el nodo.
-        
-    Devuelve:
-    --------
-    Node
-        El nodo raíz del subárbol de aislamientogenerado.
-    """
-
-    n_samples, n_features = X_prime.shape
-    
-    # Condición de parada: El nodo contiene 1 o menos instancias
-    if n_samples <= 1:
-        return Node(size=n_samples, node_type='external')
-    
-    # Condición de parada adicional: Todos los datos son idénticos 
-    if np.all(X_prime == X_prime[0]):
-        return Node(size=n_samples, node_type='external')
-    
-    # Seleccionamos aleatoriamente un atributo q
-    q = np.random.randint(0, n_features)
-    min_val = np.min(X_prime[:, q])
-    max_val = np.max(X_prime[:, q])
-    
-    # Si todos los valores del atributo aleatorio son iguales, 
-    # forzamos un nodo externo para evitar bucles infinitos.
-    if min_val == max_val:
-        return Node(size=n_samples, node_type='external')
-    
-    # Seleccionamos aleatoriamente un valor de partición p entre min_val y max_val
-    p = np.random.uniform(min_val, max_val)
-    
-    # Particionamos los datos en dos subconjuntos basados en el valor de corte p
-    left_mask = X_prime[:, q] < p
-
-    X_l = X_prime[left_mask]
-    X_r = X_prime[~left_mask]
-    
-    # Llamadas recursivas para construir los subárboles
-    left_child = iTree(X_l)
-    right_child = iTree(X_r)
-    
-    # Devolvemos nodo interno
-    return Node(left=left_child, right=right_child, split_att=q, split_val=p, 
-                size=n_samples, node_type='internal')
-
-
-def PathLength(x, T, height_limit, e=0):
-    """
-    Algoritmo 3: PathLength(x, T, hlim, e) - Calcula la longitud de ruta de x.
-    
-    Evalúa la longitud del camino recorrido por una instancia x desde la raíz 
-    hasta un nodo externo. Incorpora el factor de ajuste c(Size) si el árbol 
-    termina antes debido al límite de altura.
-    
     Parámetros:
     -----------
     x : numpy.ndarray
         Instancia individual a evaluar.
-    T : Node
-        Nodo actual del iTree.
-    height_limit : int
-        Límite de altura para la recursión.
-    e : int
-        Longitud del camino actual.
-        
+    bosque : list
+        Lista de árboles (iTrees) construidos durante el entrenamiento.
+    psi : int
+        Tamaño de la submuestra utilizada para construir cada árbol.
+    hlim : int, opcional
+        Límite de altura para la evaluación de h(x). Por defecto es psi - 1.
+
     Devuelve:
     --------
     float
-        La longitud del camino h(x) estimada para la instancia.
+        Puntuación de anomalía s(x, psi) en el rango [0, 1].
+    """
+    if hlim is None:
+        hlim = psi - 1
+
+    E_h = sum(path_length(x, T, hlim) for T in bosque) / len(bosque)
+    return 2 ** (-E_h / c(psi))
+
+
+# ---------------------------------------------------------------------------
+# Algoritmo 1: construcción del iForest
+# ---------------------------------------------------------------------------
+def iforest(X, t=100, psi=256):
+    """
+    Construye t iTrees, cada uno sobre una submuestra de tamaño psi extraída
+    de X sin reemplazamiento.
+    """
+    if psi > len(X):
+        raise ValueError("psi no puede ser mayor que el número de observaciones.")
+    return [itree(random.sample(X, psi)) for _ in range(t)]
+
+# ---------------------------------------------------------------------------
+# Algoritmo 2: construcción de un iTree
+# ---------------------------------------------------------------------------
+def itree(X):
+    """
+    Construye un iTree sobre la submuestra X dividiéndola recursivamente hasta
+    que no se puede dividir más, es decir, hasta que el nodo tiene una sola
+    observación o todas sus observaciones son iguales.
     """
 
-    if T.node_type == 'external' or e >= height_limit:
-        return e + c_factor(T.size)
-    
-    a = T.split_att
-    if x[a] < T.split_val:
-        return PathLength(x, T.left, height_limit, e + 1)
-    else:
-        return PathLength(x, T.right, height_limit, e + 1)
+    # Atributos que toman más de un valor en el nodo. Solo sobre ellos se
+    # puede elegir un punto de corte que separe los datos.
+    Q = [q for q in range(len(X[0])) if min(x[q] for x in X) < max(x[q] for x in X)]
 
-class IsolationForest:
+    # El nodo no se puede dividir si tiene una sola observación (|X| <= 1)
+    # o si todas son iguales (Q vacío): es un nodo externo.
+    if len(X) <= 1 or not Q:
+        return {"tam": len(X)}
+
+    # Se elige al azar un atributo q y un punto de corte p entre el mínimo y
+    # el máximo de q en el nodo.
+    q = random.choice(Q)
+    minimo = min(x[q] for x in X)
+    maximo = max(x[q] for x in X)
+    p = random.uniform(minimo, maximo)
+
+    X_izq = [x for x in X if x[q] < p]
+    X_der = [x for x in X if x[q] >= p]
+
+    return {"tam": len(X), "q": q, "p": p,
+            "izq": itree(X_izq), "der": itree(X_der)}
+
+# ---------------------------------------------------------------------------
+# Algoritmo 3: longitud de ruta h(x)
+# ---------------------------------------------------------------------------
+def path_length(x, T, hlim, e=0):
     """
-    Algoritmo 1: iForest(X, t, psi) - Ensamblado completo del Isolation Forest.
-    
-    Combina múltiples árboles de aislamiento entrenados sobre submuestras aleatorias.
-    """
-    def __init__(self, n_estimators=100, subsampling_size=256):
-        """
-        Parámetros:
+    Recorre el árbol T con la observación x y devuelve h(x).
+
+    e cuenta las aristas recorridas desde la raíz. Al llegar a un nodo externo,
+    o al alcanzar el límite de altura hlim, se devuelve e + c(T.tam): el
+    término c(T.tam) estima la longitud de ruta que faltaría recorrer en el
+    subárbol de T.tam observaciones que queda por debajo.
+
+     Parámetros:
         -----------
-        n_estimators : int (t)
-            Número de árboles a construir. Valor por defecto: 100.
-        subsampling_size : int (psi)
-            Tamaño de la submuestra sin reemplazo. Valor por defecto: 256.
-        """
-        self.t = n_estimators
-        self.psi = subsampling_size
-        self.trees = []
-        self.height_limit = 0
-    
-    def fit(self, X):
-        """
-        Construye el bosque de aislamiento (etapa de entrenamiento).
-        """
-        n_samples = X.shape[0]
-        actual_psi = min(self.psi, n_samples)
-        
-        # El límite de altura crece logarítmicamente respecto al tamaño de muestra
-        # hlim = ceil(log2(psi))
-        self.height_limit = int(np.ceil(np.log2(max(actual_psi, 2))))
-        self.trees = []
-        
-        for _ in range(self.t):
-            # Muestreo aleatorio sin reemplazo
-            indices = np.random.choice(n_samples, actual_psi, replace=False)
-            X_prime = X[indices]
+        x : numpy.ndarray
+            Instancia individual a evaluar.
+        T : Node
+            Nodo actual del iTree.
+        hlim : int
+            Límite de altura para la recursión.
+        e : int
+            Longitud del camino actual.
             
-            # Construir iTree
-            tree = iTree(X_prime)
-            self.trees.append(tree)
-            
-        return self
-
-
-    def anomaly_score(self, X_eval):
-
-        """
-        Etapa de Evaluación: Cálculo del anomaly score.
-        
-        s(x, psi) = 2^(- E(h(x)) / c(psi))
-        
-        - Si s -> 1, la instancia es altamente anómala.
-        - Si s -> 0, la instancia es muy normal.
-        - Si s -> 0.5, no hay distinción clara.
-        
         Devuelve:
         --------
-        scores : numpy.ndarray
-            Puntuaciones de anomalía s(x) en el rango [0, 1].
-        mean_path_length : numpy.ndarray
-            La esperanza de la longitud de camino E(h(x)).
-        """
+        float
+            La longitud del camino h(x) estimada para la instancia.
 
-        X_eval = np.atleast_2d(X_eval)
-        n_eval = len(X_eval)
-        paths = np.zeros((n_eval, self.t))
-        
-        # Propagar instancias a través de cada árbol
-        for t_idx, tree in enumerate(self.trees):
-            for i in range(n_eval):
-                paths[i, t_idx] = PathLength(X_eval[i], tree, self.height_limit, e=0)
-                
-        # Calcular esperanza estadística de h(x)
-        mean_path_length = np.mean(paths, axis=1)
-        
-        # Calcular c(psi) para normalizar la longitud de camino
-        c_psi = c_factor(self.psi)
-        
-        # Computar score
-        if c_psi == 0:
-            scores = np.zeros(n_eval)
-        else:
-            scores = 2.0 ** (- (mean_path_length / c_psi))
-            
-        return scores, mean_path_length
+    """
+    if "q" not in T or e >= hlim:
+        return e + c(T["tam"])
+
+    if x[T["q"]] < T["p"]:
+        return path_length(x, T["izq"], hlim, e + 1)
+    return path_length(x, T["der"], hlim, e + 1)
