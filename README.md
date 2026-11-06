@@ -5,8 +5,7 @@ Código del Trabajo Fin de Grado *Propiedades Estadísticas de Metodologías de 
 
 El trabajo estudia, mediante simulación, en qué medida el orden que induce la longitud de ruta media de un
 bosque de aislamiento (*Isolation Forest*, Liu, Ting y Zhou, 2012) y de su versión extendida (*Extended
-Isolation Forest*, Hariri, Carrasco Kind y Brunner, 2021) reproduce el que induce la profundidad de Tukey,
-y en qué situaciones deja de hacerlo.
+Isolation Forest*, Hariri, Carrasco Kind y Brunner, 2021) reproduce el que induce la profundidad de Tukey y en qué situaciones no se relacionan.
 
 ## Instalación (Windows)
 

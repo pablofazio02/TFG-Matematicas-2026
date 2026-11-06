@@ -1,0 +1,24 @@
+comprobacion,metodo,parametro,valor
+vectorizado_vs_recursivo,iForest,hlim=3,0.0
+vectorizado_vs_recursivo,EIF,hlim=3,0.0
+vectorizado_vs_recursivo,iForest,hlim=8,0.0
+vectorizado_vs_recursivo,EIF,hlim=8,0.0
+vectorizado_vs_recursivo,iForest,hlim=255,0.0
+vectorizado_vs_recursivo,EIF,hlim=255,0.0
+estructura,iForest,"hojas (min, max)","256, 256"
+estructura,iForest,"nodos internos (min, max)","255, 255"
+eif_k0,iForest,"x=(2, -1) media",13.521333333333333
+eif_k0,EIF k=0,"x=(2, -1) media",13.526
+eif_k0,KS,"x=(2, -1) p-valor",0.9765015345578797
+eif_k0,iForest,"x=(4.5, 0.5) media",9.729
+eif_k0,EIF k=0,"x=(4.5, 0.5) media",9.789333333333333
+eif_k0,KS,"x=(4.5, 0.5) p-valor",0.5646743460194811
+eif_k0,iForest,"x=(2, 0.5) media",8.663
+eif_k0,EIF k=0,"x=(2, 0.5) media",8.635666666666667
+eif_k0,KS,"x=(2, 0.5) p-valor",0.995610839822024
+eif_k0,iForest,"x=(-1, -3) media",7.215333333333334
+eif_k0,EIF k=0,"x=(-1, -3) media",7.199666666666666
+eif_k0,KS,"x=(-1, -3) p-valor",0.9998697469672679
+invarianza_iforest,iForest,afín por coordenadas: max |dif|,0.0
+invarianza_iforest,iForest,rotación 30 grados: max |dif|,1.3149999999999995
+invarianza_iforest,iForest,rotación 30 grados: tau_b,0.8618363046393603
